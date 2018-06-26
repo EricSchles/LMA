@@ -1,0 +1,4 @@
+from uszipcode import ZipcodeSearchEngine
+
+search = ZipcodeSearchEngine()
+zipcode = search.by_zipcode(contract_zipcode)
