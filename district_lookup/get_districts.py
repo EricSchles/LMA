@@ -27,7 +27,7 @@ def get_address(rec):
 def get_rep_rec(address, filters):
     url_base = 'https://www.googleapis.com/civicinfo/v2/representatives'
     api_key = config.api_key
-    extras = '&'.join("{!s}={!s}".format(i[0],i[1]) for i in filters)
+    extras = '&'.join("{!s}={!s}".format(i[0], i[1]) for i in filters)
     url = "%s?address=%s&key=%s&%s" % (url_base, address, api_key, extras)
     print(api_key)
     print(url)
@@ -36,12 +36,46 @@ def get_rep_rec(address, filters):
     return(response)
 
 
+def create_signature(rec, address):
+    first = rec['First Name ']
+    last = rec['Last Name']
+    signature = "%s %s, %s" % (first, last, address)
+    return(signature)
+
+
+def extract_jurisdictions(rep_rec):
+    """
+
+    Output is list of offices where address is.
+    Example output:
+        ['VA-Sen', 'VA-08-Rep']
+        ['IL-Sen', 'IL-06-Rep']
+        ['NY-Sen', 'NY-27-Rep']
+
+    """
+
+    offices = rep_rec.json()['offices']
+    jurisdictions = []
+    for office in offices:
+        office_text = ''
+        o_name = office['name']
+        if o_name == 'United States Senate':
+            state = office['divisionId'][-2:]
+            office_text = state.upper() + '-' + "Sen"
+        else:
+            district = o_name.lstrip('United States House of Representatives ')
+            office_text = district + '-' + "Rep"
+        jurisdictions.append(office_text)
+    return(jurisdictions)
+
+
 if __name__ == "__main__":
     data = read_data('../../data/kft-signers_sample.csv')
     rep_records = []
     for rec in data[:5]:
         address = get_address(rec)
-        # This must be a tuple, because each [0] item can have multiple instances.
+
+        # Must be a tuple, because each [0] item can have multiple instances.
         filters = (
             ('levels', 'country'),
             ('roles', 'legislatorLowerBody'),
@@ -49,17 +83,26 @@ if __name__ == "__main__":
             ('fields', 'normalizedInput,offices')
         )
         rep_rec = get_rep_rec(address, filters)
-        rep_records.append(rep_rec)
+        jurisdictions = extract_jurisdictions(rep_rec)
+        signature = create_signature(rec, address)
+
+
+
+
+
+        print(jurisdictions)
+        print(signature)
 
     #print(rep_records)
-    for rec in rep_records:
-        print(rec.json())
-
 
 
 #TODOs
+
 # - Create state folder if it doesn't exist
 # - Create file if it doesn't exist
 # - Add signature to file
 # - Create log of failed requests
 # - Write tests
+
+#Resources
+# - List of congressional members -- https://github.com/unitedstates/congress-legislators
