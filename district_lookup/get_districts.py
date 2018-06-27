@@ -1,15 +1,15 @@
-import config
 import csv
 import logging
 import requests
-import time
 
+from config import API_KEY
 from datetime import datetime
 from os import mkdir
 
 
 output_folder = '../../signature_output/'
-source_data = '../../data/kft-signers_sample.csv'
+# source_data = '../../data/kft-signers_sample.csv'
+source_data = '../../data/kft-signers.csv'
 logging_level = logging.DEBUG
 
 
@@ -35,10 +35,16 @@ def get_address(rec):
 
 
 def get_rep_rec(address, filters):
+
     url_base = 'https://www.googleapis.com/civicinfo/v2/representatives'
-    api_key = config.api_key
     extras = '&'.join("{!s}={!s}".format(i[0], i[1]) for i in filters)
-    url = "%s?address=%s&key=%s&%s" % (url_base, address, api_key, extras)
+    url = "%s?address=%s&key=%s&%s" % (url_base, address, API_KEY, extras)
+
+    # if oauth:
+    #     auth = OAuth1(API_KEY, API_SECRET, CLIENT_ID, CLIENT_SECRET)
+    #     response = requests.get(url, auth=auth)
+
+    # else:
     response = requests.get(url)
     print(url)
     print(response)
@@ -91,17 +97,17 @@ if __name__ == "__main__":
 
     # Create timestamped folders
     now = datetime.now
-    time_of_run = '{}'.format(now().strftime('%Y-%m-%d-%H:%M:%S'))
+    time_of_run = '{}'.format(now().strftime('%Y-%m-%d-%H%M%S'))
     output_folder = output_folder + time_of_run + '/'
     mkdir(output_folder)
     log_file = output_folder + 'output.log'
-    logging.basicConfig(filename=log_file,level=logging_level)
+    logging.basicConfig(filename=log_file, level=logging_level)
 
     # Read and process data
     data = read_data(source_data)
     rep_records = []
     count = 1
-    for rec in data[:1000]:
+    for rec in data:
         address = get_address(rec)
 
         # Must be a tuple, because each [0] item can have multiple instances.
@@ -117,12 +123,15 @@ if __name__ == "__main__":
 
 
         # Write lines out to files in folder
-        for j in jurisdictions:
-            file_name = output_folder + j + '.txt'
-            f = open(file_name, "a+")
-            f.write(signature)
-            f.write('\n')
-            f.close()
+        try:
+            for j in jurisdictions:
+                file_name = output_folder + j + '.txt'
+                f = open(file_name, "a+")
+                f.write(signature)
+                f.write('\n')
+                f.close()
+        except:
+            print('############### Error!!!!!!!!!!!!!!!!! ############')
 
         count += 1
         print(count)
@@ -136,7 +145,7 @@ if __name__ == "__main__":
 #TODOs
 
 # - Check for duplicate signatures
-# - Create log of failed requests
+# - Check logs for requests and resulted in errors
 # - Write tests
 
 #Resources
