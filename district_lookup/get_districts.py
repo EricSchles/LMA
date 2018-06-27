@@ -1,6 +1,16 @@
 import config
 import csv
+import logging
 import requests
+import time
+
+from datetime import datetime
+from os import mkdir
+
+
+output_folder = '../../signature_output/'
+source_data = '../../data/kft-signers_sample.csv'
+logging_level = logging.DEBUG
 
 
 def read_data(csv_file):
@@ -29,14 +39,19 @@ def get_rep_rec(address, filters):
     api_key = config.api_key
     extras = '&'.join("{!s}={!s}".format(i[0], i[1]) for i in filters)
     url = "%s?address=%s&key=%s&%s" % (url_base, address, api_key, extras)
-    print(api_key)
-    print(url)
     response = requests.get(url)
+    print(url)
     print(response)
     return(response)
 
 
 def create_signature(rec, address):
+    """
+
+    Output is a string
+    Example output: `John Doe, 123 Sunny Lane, FL 34207`
+
+    """
     first = rec['First Name ']
     last = rec['Last Name']
     signature = "%s %s, %s" % (first, last, address)
@@ -53,26 +68,40 @@ def extract_jurisdictions(rep_rec):
         ['NY-Sen', 'NY-27-Rep']
 
     """
-
-    offices = rep_rec.json()['offices']
-    jurisdictions = []
-    for office in offices:
-        office_text = ''
-        o_name = office['name']
-        if o_name == 'United States Senate':
-            state = office['divisionId'][-2:]
-            office_text = state.upper() + '-' + "Sen"
-        else:
-            district = o_name.lstrip('United States House of Representatives ')
-            office_text = district + '-' + "Rep"
-        jurisdictions.append(office_text)
-    return(jurisdictions)
+    try:
+        offices = rep_rec.json()['offices']
+        jurisdictions = []
+        for office in offices:
+            office_text = ''
+            o_name = office['name']
+            if o_name == 'United States Senate':
+                state = office['divisionId'][-2:]
+                office_text = state.upper() + '-' + "Sen"
+            else:
+                text = 'United States House of Representatives '
+                district = o_name.lstrip(text)
+                office_text = district + '-' + "Rep"
+            jurisdictions.append(office_text)
+        return(jurisdictions)
+    except Exception as e:
+        logging.error('Error: %s' % rep_rec, exc_info=e)
 
 
 if __name__ == "__main__":
-    data = read_data('../../data/kft-signers_sample.csv')
+
+    # Create timestamped folders
+    now = datetime.now
+    time_of_run = '{}'.format(now().strftime('%Y-%m-%d-%H:%M:%S'))
+    output_folder = output_folder + time_of_run + '/'
+    mkdir(output_folder)
+    log_file = output_folder + 'output.log'
+    logging.basicConfig(filename=log_file,level=logging_level)
+
+    # Read and process data
+    data = read_data(source_data)
     rep_records = []
-    for rec in data[:5]:
+    count = 1
+    for rec in data[:1000]:
         address = get_address(rec)
 
         # Must be a tuple, because each [0] item can have multiple instances.
@@ -87,20 +116,26 @@ if __name__ == "__main__":
         signature = create_signature(rec, address)
 
 
+        # Write lines out to files in folder
+        for j in jurisdictions:
+            file_name = output_folder + j + '.txt'
+            f = open(file_name, "a+")
+            f.write(signature)
+            f.write('\n')
+            f.close()
 
+        count += 1
+        print(count)
+        # # Pulling back on API, to try to reduce errors.
+        #
+        # if count % 25 == 0:
+        #     time.sleep(1)
 
-
-        print(jurisdictions)
-        print(signature)
-
-    #print(rep_records)
 
 
 #TODOs
 
-# - Create state folder if it doesn't exist
-# - Create file if it doesn't exist
-# - Add signature to file
+# - Check for duplicate signatures
 # - Create log of failed requests
 # - Write tests
 

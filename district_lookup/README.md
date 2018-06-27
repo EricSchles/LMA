@@ -1,5 +1,7 @@
 # How this script works
 
+Use Python3.
+
 Before you run, you will need do the following:
 
 1. [Get an API key](https://console.developers.google.com/apis/credentials?project=lma-kft&folder&organizationId)  from Google to use with their their Civic API.
