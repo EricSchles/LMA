@@ -35,16 +35,27 @@ def read_data(csv_file):
 
 
 def get_address(rec):
-    street = rec["Street"]
-    city = rec["City"]
-    state = rec["State"]
-    zipcode = str(rec["Zip code"])
+    street = rec["Street"].strip()
+    city = rec["City"].strip()
+    state = rec["State"].strip()
+    zipcode = str(rec["Zip code"]).strip()
+
     if len(zipcode) == 4:
         # Fixes zipcodes where the "0" was dropped.
         zipcode = '0' + zipcode
+
     address = ", ".join((street, city, state)) + " " + zipcode
+
+    street_no_apt = None
+    address_no_apt = address
+    if "#" in street:
+        x = street.split('#')
+        street_no_apt = x[0].strip()
+        address_no_apt = ", ".join((street_no_apt, city, state)) + " " + zipcode
+
+
     # print(address)
-    return(address)
+    return(address, address_no_apt)
 
 
 def get_rep_rec(address, filters):
@@ -106,6 +117,66 @@ def extract_jurisdictions(rep_rec):
         global error_count
         error_count += 1
 
+def remove_duplicates(data):
+    '''
+
+    Some people signed twice. We need to remove those.
+    Oh god, this is so messy, but I was deadline.
+
+    '''
+
+    emails = set()
+    to_remove = []
+
+    cleaned_data = [dict(i) for i in data[:]]
+
+    for rec in data:
+        email = rec["Email Address"].strip().lower()
+        first = rec["First Name "].strip().lower()
+        last = rec["Last Name"].strip().lower()
+
+        if email in emails:
+
+            for rec1 in data:
+                email1 = rec1["Email Address"].strip().lower()
+                # If emails match
+                if email1 == email:
+
+                    # Pull the name and zip
+                    first1 = rec1["First Name "].strip().lower()
+                    last1 = rec1["Last Name"].strip().lower()
+                    zipcode1 = rec1["Zip code"].strip().lower()
+                    timestamped1 = rec1["Timestamp"]
+
+                    # Addition info to pull from the first record
+                    zipcode = rec["Zip code"].strip().lower()
+                    timestamped = rec["Timestamp"]
+
+                    if (first, last, zipcode) == (first1, last1, zipcode1):
+                        if timestamped1 != timestamped:
+                            logging.debug("Duplicate record found-------------")
+                            logging.debug("First record:")
+                            address, x = get_address(rec)
+
+                            logging.debug((first, last, zipcode, email,
+                                          timestamped, address))
+
+                            logging.debug("Second record:")
+                            address1, x1 = get_address(rec1)
+
+                            logging.debug((first1, last1, zipcode1, email1,
+                                          timestamped1, address1))
+
+                            if dict(rec1) in cleaned_data:
+                                cleaned_data.remove(dict(rec1))
+
+        emails.add(email)
+
+    logging.info("Length of original data: %s" % len(data))
+    logging.info("Length of cleaned data: %s" % len(cleaned_data))
+
+    return(cleaned_data)
+
 
 if __name__ == "__main__":
 
@@ -124,10 +195,12 @@ if __name__ == "__main__":
 
     # Read and process data
     data = read_data(source_data)
+    data = remove_duplicates(data)
+
     rep_records = []
     count = 1
-    for rec in data[:500]:
-        address = get_address(rec)
+    for rec in data[:250]:
+        address, address_no_apt = get_address(rec)
 
         # Must be a tuple, because each [0] item can have multiple instances.
         filters = (
@@ -136,7 +209,7 @@ if __name__ == "__main__":
             ('roles', 'legislatorUpperBody'),
             ('fields', 'normalizedInput,offices')
         )
-        rep_rec = get_rep_rec(address, filters)
+        rep_rec = get_rep_rec(address_no_apt, filters)
         jurisdictions = extract_jurisdictions(rep_rec)
         signature = create_signature(rec, address)
 
