@@ -4,6 +4,7 @@ import os
 import requests
 import time
 
+from collections import defaultdict
 from config import API_KEY
 from datetime import datetime
 
@@ -114,8 +115,11 @@ def extract_jurisdictions(rep_rec):
     except Exception as e:
         logging.error('############## Error!!!!!!!!!!!!!!!!! ###########')
         logging.error('Error: %s' % rep_rec, exc_info=e)
+        logging.error(rep_rec.url)
+        logging.error(rep_rec.status_code)
         global error_count
         error_count += 1
+
 
 def remove_duplicates(data):
     '''
@@ -126,7 +130,6 @@ def remove_duplicates(data):
     '''
 
     emails = set()
-    to_remove = []
 
     cleaned_data = [dict(i) for i in data[:]]
 
@@ -154,7 +157,7 @@ def remove_duplicates(data):
 
                     if (first, last, zipcode) == (first1, last1, zipcode1):
                         if timestamped1 != timestamped:
-                            logging.debug("Duplicate record found-------------")
+                            logging.debug("Duplicate record found------------")
                             logging.debug("First record:")
                             address, x = get_address(rec)
 
@@ -192,14 +195,14 @@ if __name__ == "__main__":
     logging.info('----------------------------------------------------- NEW RUN -------------------------------------------')
     logging.info(start)
 
-
     # Read and process data
     data = read_data(source_data)
     data = remove_duplicates(data)
 
     rep_records = []
+    status_counts = defaultdict(int)
     count = 1
-    for rec in data[:250]:
+    for rec in data[:1000]:
         address, address_no_apt = get_address(rec)
 
         # Must be a tuple, because each [0] item can have multiple instances.
@@ -234,12 +237,18 @@ if __name__ == "__main__":
             logging.error('Error: %s' % rep_rec, exc_info=e)
             error_count += 1
 
+        status_counts[rep_rec.status_code] += 1
+
         count += 1
 
         # Pulling back on API, to try to reduce errors.
         if count % 50 == 0:
-            print(count)
-            print(error_count)
+            logging.info("Total: %s" % count)
+            print("Total: %s" % count)
+            logging.info("Errors: %s" % error_count)
+            print("Errors: %s" % error_count)
+            logging.info("HTTP Status counts: %s" % status_counts)
+            print("HTTP Status counts: %s" % status_counts)
             time.sleep(3)
 
     end = datetime.now()
@@ -249,12 +258,9 @@ if __name__ == "__main__":
     logging.info((time_diff.min, time_diff.seconds))
 
 
-#TODOs
-
-# - Check for duplicate signatures
-# - Check logs for requests and resulted in errors
-# - Add message to start of file
+# TODOs
 # - Write tests
 
-#Resources
-# - List of congressional members -- https://github.com/unitedstates/congress-legislators
+# Resources
+# List of congressional members --
+# https://github.com/unitedstates/congress-legislators
